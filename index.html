@@ -310,7 +310,7 @@
 // CONFIGURATION — replace with your API key
 // Get one free at: https://console.anthropic.com
 // ─────────────────────────────────────────────
-const ANTHROPIC_API_KEY = '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';
+const OPENROUTER_API_KEY = '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';
 
 const SYSTEM_PROMPT = `You are an AI agent embedded in "AgentGraph" — a portfolio project by a software engineer targeting AI engineering roles. The app demonstrates LangGraph-style multi-tool agent architecture.
 
@@ -447,37 +447,45 @@ async function sendMsg() {
   const start = Date.now();
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: SYSTEM_PROMPT,
-        messages: history
-      })
-    });
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      'HTTP-Referer': window.location.origin,
+      'X-OpenRouter-Title': 'AgentGraph'
+    },
+    body: JSON.stringify({
+      model: 'openai/gpt-4o-mini',
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        ...history
+      ]
+    })
+  });
 
-    const data = await res.json();
-    const elapsed = Date.now() - start;
-    const content = data.content?.map(b => b.text || '').join('') || 'No response received.';
+  const data = await res.json();
 
-    history.push({ role: 'assistant', content });
-    document.getElementById('typing')?.remove();
-
-    sessionRuns++;
-    document.getElementById('stat-runs').textContent = sessionRuns;
-    processTrace(content, elapsed);
-    appendMsg('assistant', formatMsg(content));
-
-  } catch (err) {
-    document.getElementById('typing')?.remove();
-    addTrace('done', '✗ error: ' + err.message);
-    appendMsg('assistant', 'Connection error. Check your API key in <code>index.html</code>.');
+  if (!res.ok) {
+    throw new Error(data?.error?.message || JSON.stringify(data));
   }
 
-  btn.disabled = false;
-  input.focus();
+  const content = data.choices?.[0]?.message?.content || 'No response received.';
+  const elapsed = Date.now() - start;
+
+  history.push({ role: 'assistant', content });
+  document.getElementById('typing')?.remove();
+
+  sessionRuns++;
+  document.getElementById('stat-runs').textContent = sessionRuns;
+  processTrace(content, elapsed);
+  appendMsg('assistant', formatMsg(content));
+
+} catch (err) {
+  document.getElementById('typing')?.remove();
+  addTrace('done', '✗ error: ' + err.message);
+  appendMsg('assistant', `Error: <code>${err.message}</code>`);
+}
 }
 
 function usePrompt(p) {
