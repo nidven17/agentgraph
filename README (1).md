@@ -80,4 +80,4 @@ START → planner (LLM) → router → [web_search | calculator | rag_retriever]
 
 ---
 
-Built by **Nidhi Venigalla** · [[LinkedIn](https://www.linkedin.com/in/nidhi-venigalla](#) · [Portfolio](#)
+Built by **Nidhi Venigalla** · [https://www.linkedin.com/in/nidhi-venigalla](#)
