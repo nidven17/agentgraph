@@ -2,7 +2,7 @@
 
 An interactive AI agent demo showcasing LangGraph-style multi-tool orchestration, ReAct reasoning loops, and RAG retrieval patterns — built with the Claude API.
 
-**[Live Demo →](#)** *(replace with your GitHub Pages URL)*
+**[Live Demo →]([#](https://nidven17.github.io/agentgraph/))**
 
 ---
 
