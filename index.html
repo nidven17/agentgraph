@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentGraph — AI Agent Demo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg-primary: #ffffff; --bg-secondary: #f5f4f0; --bg-tertiary: #eeede9;
+    --text-primary: #1a1a18; --text-secondary: #5f5e5a; --text-tertiary: #888780;
+    --border-light: rgba(0,0,0,0.1); --border-mid: rgba(0,0,0,0.18);
+    --teal-light: #E1F5EE; --teal-mid: #1D9E75; --teal-dark: #0F6E56; --teal-darker: #085041;
+    --purple-light: #EEEDFE; --purple-dark: #534AB7; --purple-darker: #3C3489;
+    --blue-light: #E6F1FB; --blue-dark: #185FA5; --blue-darker: #0C447C;
+    --amber-light: #FAEEDA; --amber-dark: #854F0B; --amber-darker: #633806;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-primary: #1c1c1a; --bg-secondary: #242422; --bg-tertiary: #2c2c2a;
+      --text-primary: #e8e7e2; --text-secondary: #a8a79f; --text-tertiary: #6b6a65;
+      --border-light: rgba(255,255,255,0.08); --border-mid: rgba(255,255,255,0.14);
+      --teal-light: #04342C; --teal-dark: #5DCAA5; --teal-darker: #9FE1CB;
+      --purple-light: #26215C; --purple-dark: #AFA9EC; --purple-darker: #CECBF6;
+      --blue-light: #042C53; --blue-dark: #85B7EB; --blue-darker: #B5D4F4;
+      --amber-light: #412402; --amber-dark: #EF9F27; --amber-darker: #FAC775;
+    }
+  }
+  body { font-family: 'Syne', sans-serif; background: var(--bg-tertiary); color: var(--text-primary); min-height: 100vh; display: flex; flex-direction: column; }
+  .topbar { background: var(--bg-primary); border-bottom: 0.5px solid var(--border-light); padding: 14px 24px; display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+  .logo { font-size: 17px; font-weight: 700; letter-spacing: -0.5px; }
+  .logo span { color: var(--teal-mid); }
+  .badge { font-size: 11px; font-weight: 500; background: var(--teal-light); color: var(--teal-dark); padding: 3px 9px; border-radius: 20px; font-family: 'JetBrains Mono', monospace; }
+  .topbar-meta { font-size: 12px; color: var(--text-tertiary); font-family: 'JetBrains Mono', monospace; }
+  .tabs { display: flex; gap: 4px; margin-left: auto; }
+  .tab { font-size: 13px; padding: 6px 14px; border-radius: 6px; cursor: pointer; border: 0.5px solid transparent; color: var(--text-secondary); transition: all 0.15s; font-family: 'Syne', sans-serif; background: none; }
+  .tab.active { background: var(--bg-primary); border-color: var(--border-mid); color: var(--text-primary); font-weight: 600; }
+  .tab:hover:not(.active) { background: var(--bg-secondary); }
+  .shell { display: grid; grid-template-columns: 250px 1fr; flex: 1; min-height: 0; height: calc(100vh - 57px); }
+  .sidebar { background: var(--bg-primary); border-right: 0.5px solid var(--border-light); overflow-y: auto; padding: 20px 0; }
+  .sidebar-section { padding: 0 16px 24px; }
+  .sidebar-label { font-size: 10px; font-weight: 600; letter-spacing: 1.2px; color: var(--text-tertiary); text-transform: uppercase; margin-bottom: 10px; padding: 0 4px; }
+  .tool-card { border: 0.5px solid var(--border-light); border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; background: var(--bg-secondary); transition: all 0.2s; }
+  .tool-card.active { border-color: var(--teal-mid); background: var(--teal-light); }
+  .tool-card.active .tool-name { color: var(--teal-dark); }
+  .tool-card.active .tool-dot { background: var(--teal-mid); }
+  .tool-name { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+  .tool-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border-mid); flex-shrink: 0; transition: background 0.2s; }
+  .tool-desc { font-size: 11px; color: var(--text-secondary); margin-top: 3px; line-height: 1.5; padding-left: 15px; }
+  .config-row, .stat-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; padding: 0 4px; margin-bottom: 8px; }
+  .config-row span:first-child, .stat-row span:first-child { color: var(--text-tertiary); }
+  .main { display: flex; flex-direction: column; overflow: hidden; }
+  .view { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+  .view.visible { display: flex; }
+  .agent-layout { display: grid; grid-template-columns: 1fr 290px; flex: 1; min-height: 0; }
+  .chat-col { display: flex; flex-direction: column; border-right: 0.5px solid var(--border-light); overflow: hidden; }
+  .messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 82%; }
+  .msg.user { align-self: flex-end; }
+  .msg.assistant { align-self: flex-start; }
+  .msg-label { font-size: 11px; color: var(--text-tertiary); margin-bottom: 4px; font-family: 'JetBrains Mono', monospace; }
+  .msg.user .msg-label { text-align: right; }
+  .msg-bubble { padding: 11px 15px; border-radius: 12px; font-size: 14px; line-height: 1.65; }
+  .msg.user .msg-bubble { background: var(--teal-dark); color: var(--teal-light); border-bottom-right-radius: 3px; }
+  .msg.assistant .msg-bubble { background: var(--bg-primary); border: 0.5px solid var(--border-light); border-bottom-left-radius: 3px; }
+  .input-row { padding: 16px 20px; border-top: 0.5px solid var(--border-light); display: flex; gap: 10px; background: var(--bg-primary); flex-shrink: 0; }
+  .input-row input { flex: 1; border: 0.5px solid var(--border-mid); border-radius: 8px; padding: 10px 14px; font-size: 14px; font-family: 'Syne', sans-serif; background: var(--bg-secondary); color: var(--text-primary); outline: none; transition: border-color 0.15s; }
+  .input-row input:focus { border-color: var(--teal-mid); }
+  .send-btn { background: var(--teal-dark); color: var(--teal-light); border: none; border-radius: 8px; padding: 10px 18px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'Syne', sans-serif; transition: opacity 0.15s; white-space: nowrap; }
+  .send-btn:hover { opacity: 0.85; }
+  .send-btn:disabled { opacity: 0.4; cursor: default; }
+  .trace-col { display: flex; flex-direction: column; background: var(--bg-primary); overflow: hidden; }
+  .trace-header { padding: 16px 18px; border-bottom: 0.5px solid var(--border-light); font-size: 11px; font-weight: 600; letter-spacing: 0.8px; color: var(--text-secondary); text-transform: uppercase; font-family: 'JetBrains Mono', monospace; flex-shrink: 0; }
+  .trace-log { flex: 1; overflow-y: auto; padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .trace-empty { font-size: 11px; color: var(--text-tertiary); padding: 8px; }
+  .trace-entry { padding: 7px 10px; border-radius: 6px; margin-bottom: 5px; line-height: 1.5; border-left: 2px solid transparent; }
+  .t-node  { border-left-color: #1D9E75; background: #E1F5EE; color: #085041; }
+  .t-tool  { border-left-color: #378ADD; background: #E6F1FB; color: #0C447C; }
+  .t-llm   { border-left-color: #7F77DD; background: #EEEDFE; color: #3C3489; }
+  .t-router{ border-left-color: #EF9F27; background: #FAEEDA; color: #633806; }
+  .t-done  { border-left-color: #639922; background: #EAF3DE; color: #173404; }
+  @media (prefers-color-scheme: dark) {
+    .t-node  { background: #04342C; color: #9FE1CB; }
+    .t-tool  { background: #042C53; color: #B5D4F4; }
+    .t-llm   { background: #26215C; color: #CECBF6; }
+    .t-router{ background: #412402; color: #FAC775; }
+    .t-done  { background: #173404; color: #C0DD97; }
+  }
+  .trace-time { opacity: 0.6; font-size: 10px; }
+  .typing { display: flex; gap: 5px; padding: 12px 15px; background: var(--bg-primary); border: 0.5px solid var(--border-light); border-radius: 12px; align-self: flex-start; border-bottom-left-radius: 3px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border-mid); animation: bounce 1.2s infinite; }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+  .graph-view { flex: 1; padding: 24px; overflow: auto; background: var(--bg-secondary); }
+  .graph-container { background: var(--bg-primary); border: 0.5px solid var(--border-light); border-radius: 12px; padding: 24px; }
+  .graph-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+  .run-badge { font-size: 11px; font-weight: 500; font-family: 'JetBrains Mono', monospace; padding: 3px 9px; border-radius: 20px; background: #EAF3DE; color: #3B6D11; }
+  .graph-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 11px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; margin-top: 16px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .prompts-view { flex: 1; padding: 24px; overflow: auto; background: var(--bg-secondary); }
+  .prompts-intro { font-size: 13px; color: var(--text-secondary); margin-bottom: 18px; font-family: 'JetBrains Mono', monospace; }
+  .prompts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+  .prompt-card { background: var(--bg-primary); border: 0.5px solid var(--border-light); border-radius: 10px; padding: 16px 18px; cursor: pointer; transition: all 0.15s; }
+  .prompt-card:hover { border-color: var(--teal-mid); transform: translateY(-1px); }
+  .prompt-tag { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--teal-dark); background: var(--teal-light); padding: 2px 8px; border-radius: 20px; display: inline-block; margin-bottom: 8px; }
+  .prompt-title { font-size: 14px; font-weight: 600; margin-bottom: 5px; }
+  .prompt-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+  .prompt-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+  .chip { font-size: 10px; padding: 2px 8px; border-radius: 20px; background: var(--bg-secondary); border: 0.5px solid var(--border-light); color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
+  .msg-bubble code { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--bg-secondary); padding: 1px 5px; border-radius: 3px; }
+  .node-label { font-size: 11px; font-weight: 600; letter-spacing: 0.5px; margin: 10px 0 4px; font-family: 'JetBrains Mono', monospace; }
+  .node-label:first-child { margin-top: 4px; }
+  .node-label.planner { color: var(--purple-dark); }
+  .node-label.tool    { color: var(--blue-dark); }
+  .node-label.synth   { color: var(--purple-dark); }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">agent<span>graph</span></div>
+  <div class="badge">LangGraph-style</div>
+  <div class="topbar-meta">v0.4.1 · ReAct · multi-tool</div>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('agent',this)">Agent</button>
+    <button class="tab" onclick="switchTab('graph',this)">Graph</button>
+    <button class="tab" onclick="switchTab('prompts',this)">Prompts</button>
+  </div>
+</div>
+
+<div class="shell">
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Tool registry</div>
+      <div class="tool-card active" id="tool-search">
+        <div class="tool-name"><div class="tool-dot"></div>web_search</div>
+        <div class="tool-desc">Live web search via Tavily API</div>
+      </div>
+      <div class="tool-card active" id="tool-calc">
+        <div class="tool-name"><div class="tool-dot"></div>calculator</div>
+        <div class="tool-desc">Math &amp; expression evaluator</div>
+      </div>
+      <div class="tool-card active" id="tool-rag">
+        <div class="tool-name"><div class="tool-dot"></div>rag_retriever</div>
+        <div class="tool-desc">Semantic search over vector store</div>
+      </div>
+      <div class="tool-card" id="tool-code">
+        <div class="tool-name"><div class="tool-dot"></div>code_executor</div>
+        <div class="tool-desc">Sandboxed Python runtime</div>
+      </div>
+      <div class="tool-card" id="tool-memory">
+        <div class="tool-name"><div class="tool-dot"></div>memory_store</div>
+        <div class="tool-desc">Persistent cross-session memory</div>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Model config</div>
+      <div class="config-row"><span>model</span><span>claude-3.5-sonnet</span></div>
+      <div class="config-row"><span>max_iter</span><span>6</span></div>
+      <div class="config-row"><span>temp</span><span>0.3</span></div>
+      <div class="config-row"><span>strategy</span><span>ReAct</span></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Session stats</div>
+      <div class="stat-row"><span>runs</span><span id="stat-runs">0</span></div>
+      <div class="stat-row"><span>tool calls</span><span id="stat-tools">0</span></div>
+      <div class="stat-row"><span>tokens used</span><span id="stat-tokens">0</span></div>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- Agent -->
+    <div class="view visible" id="view-agent">
+      <div class="agent-layout">
+        <div class="chat-col">
+          <div class="messages" id="messages">
+            <div class="msg assistant">
+              <div class="msg-label">agent · ready</div>
+              <div class="msg-bubble">Hello! I'm an AI agent powered by a LangGraph-style architecture. I reason across multiple steps and route to different tools — web search, calculator, and RAG retrieval — depending on your query. Try asking something that needs more than one step to answer.</div>
+            </div>
+          </div>
+          <div class="input-row">
+            <input id="user-input" placeholder="Ask the agent something…" onkeydown="if(event.key==='Enter')sendMsg()" />
+            <button class="send-btn" id="send-btn" onclick="sendMsg()">Run agent ↗</button>
+          </div>
+        </div>
+        <div class="trace-col">
+          <div class="trace-header">Execution trace</div>
+          <div class="trace-log" id="trace-log">
+            <div class="trace-empty">Waiting for run…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Graph -->
+    <div class="view" id="view-graph">
+      <div class="graph-view">
+        <div class="graph-container">
+          <div class="graph-title">
+            Agent execution graph
+            <span class="run-badge" id="graph-run-status">idle</span>
+          </div>
+          <svg viewBox="0 0 620 380" width="100%" style="max-width:620px;font-family:'JetBrains Mono',monospace" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#B4B2A9"/></marker>
+            </defs>
+            <line x1="90" y1="60" x2="90" y2="108" stroke="#B4B2A9" stroke-width="1" marker-end="url(#arr)"/>
+            <line x1="90" y1="158" x2="90" y2="208" stroke="#B4B2A9" stroke-width="1" marker-end="url(#arr)"/>
+            <line x1="140" y1="233" x2="248" y2="155" stroke="#B4B2A9" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+            <line x1="140" y1="233" x2="248" y2="233" stroke="#B4B2A9" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+            <line x1="140" y1="233" x2="248" y2="310" stroke="#B4B2A9" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+            <line x1="358" y1="155" x2="450" y2="220" stroke="#B4B2A9" stroke-width="1" marker-end="url(#arr)"/>
+            <line x1="358" y1="233" x2="450" y2="233" stroke="#B4B2A9" stroke-width="1" marker-end="url(#arr)"/>
+            <line x1="358" y1="310" x2="450" y2="246" stroke="#B4B2A9" stroke-width="1" marker-end="url(#arr)"/>
+            <line x1="530" y1="258" x2="530" y2="283" stroke="#B4B2A9" stroke-width="1" marker-end="url(#arr)"/>
+            <line x1="480" y1="308" x2="92" y2="234" stroke="#B4B2A9" stroke-width="0.5" stroke-dasharray="3 4" opacity="0.35"/>
+            <rect x="30" y="30" width="120" height="36" rx="18" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="1.5"/>
+            <text x="90" y="53" text-anchor="middle" font-size="12" fill="#085041" font-weight="600">START</text>
+            <rect x="30" y="108" width="120" height="44" rx="6" fill="#EEEDFE" stroke="#AFA9EC" stroke-width="1"/>
+            <text x="90" y="128" text-anchor="middle" font-size="11" fill="#3C3489" font-weight="600">planner</text>
+            <text x="90" y="143" text-anchor="middle" font-size="9" fill="#534AB7" opacity="0.8">decompose intent</text>
+            <rect x="30" y="208" width="120" height="50" rx="6" fill="#FAEEDA" stroke="#FAC775" stroke-width="1"/>
+            <text x="90" y="229" text-anchor="middle" font-size="11" fill="#633806" font-weight="600">router</text>
+            <text x="90" y="244" text-anchor="middle" font-size="9" fill="#854F0B" opacity="0.8">conditional edge</text>
+            <rect x="248" y="130" width="110" height="44" rx="6" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+            <text x="303" y="150" text-anchor="middle" font-size="11" fill="#0C447C" font-weight="600">web_search</text>
+            <text x="303" y="165" text-anchor="middle" font-size="9" fill="#185FA5" opacity="0.8">Tavily API</text>
+            <rect x="248" y="208" width="110" height="44" rx="6" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+            <text x="303" y="228" text-anchor="middle" font-size="11" fill="#0C447C" font-weight="600">calculator</text>
+            <text x="303" y="243" text-anchor="middle" font-size="9" fill="#185FA5" opacity="0.8">math eval</text>
+            <rect x="248" y="285" width="110" height="44" rx="6" fill="#E6F1FB" stroke="#85B7EB" stroke-width="1"/>
+            <text x="303" y="305" text-anchor="middle" font-size="11" fill="#0C447C" font-weight="600">rag_retriever</text>
+            <text x="303" y="320" text-anchor="middle" font-size="9" fill="#185FA5" opacity="0.8">vector store</text>
+            <rect x="450" y="208" width="110" height="50" rx="6" fill="#EEEDFE" stroke="#AFA9EC" stroke-width="1"/>
+            <text x="505" y="229" text-anchor="middle" font-size="11" fill="#3C3489" font-weight="600">aggregator</text>
+            <text x="505" y="244" text-anchor="middle" font-size="9" fill="#534AB7" opacity="0.8">merge results</text>
+            <rect x="450" y="283" width="110" height="44" rx="6" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="1"/>
+            <text x="505" y="303" text-anchor="middle" font-size="11" fill="#085041" font-weight="600">synthesizer</text>
+            <text x="505" y="318" text-anchor="middle" font-size="9" fill="#0F6E56" opacity="0.8">final response</text>
+            <text x="270" y="226" font-size="9" fill="#888780" opacity="0.7">re-enter if needed</text>
+          </svg>
+          <div class="graph-legend">
+            <div class="legend-item"><span class="legend-swatch" style="background:#E1F5EE;border:1px solid #5DCAA5"></span>state node</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:#EEEDFE;border:1px solid #AFA9EC"></span>llm node</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:#E6F1FB;border:1px solid #85B7EB"></span>tool node</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:#FAEEDA;border:1px solid #FAC775"></span>router node</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Prompts -->
+    <div class="view" id="view-prompts">
+      <div class="prompts-view">
+        <div class="prompts-intro">Click a prompt to load it in the agent →</div>
+        <div class="prompts-grid">
+          <div class="prompt-card" onclick="usePrompt('What are the top 3 AI agent frameworks in 2024 and how do they compare?')">
+            <div class="prompt-tag">multi-hop</div>
+            <div class="prompt-title">AI framework comparison</div>
+            <div class="prompt-desc">Triggers web_search + rag_retriever + aggregator in parallel</div>
+            <div class="prompt-chips"><span class="chip">web_search</span><span class="chip">rag_retriever</span><span class="chip">parallel</span></div>
+          </div>
+          <div class="prompt-card" onclick="usePrompt('If I invest $5,000 at 7% compound interest for 10 years, what is the final value? Show the math.')">
+            <div class="prompt-tag">tool use</div>
+            <div class="prompt-title">Compound interest calc</div>
+            <div class="prompt-desc">Routes to calculator node with multi-step math evaluation</div>
+            <div class="prompt-chips"><span class="chip">calculator</span><span class="chip">ReAct</span></div>
+          </div>
+          <div class="prompt-card" onclick="usePrompt('Explain how RAG (Retrieval Augmented Generation) works, then describe best practices for chunking strategies.')">
+            <div class="prompt-tag">rag + search</div>
+            <div class="prompt-title">RAG deep dive</div>
+            <div class="prompt-desc">Retrieves from vector store then augments with web search</div>
+            <div class="prompt-chips"><span class="chip">rag_retriever</span><span class="chip">web_search</span><span class="chip">synthesis</span></div>
+          </div>
+          <div class="prompt-card" onclick="usePrompt('What is LangGraph and how does it differ from LangChain? When should I use each one?')">
+            <div class="prompt-tag">reasoning</div>
+            <div class="prompt-title">LangGraph vs LangChain</div>
+            <div class="prompt-desc">Tests multi-source synthesis and structured comparison output</div>
+            <div class="prompt-chips"><span class="chip">web_search</span><span class="chip">rag_retriever</span></div>
+          </div>
+          <div class="prompt-card" onclick="usePrompt('What are the most important recent developments in AI agents and autonomous systems?')">
+            <div class="prompt-tag">live search</div>
+            <div class="prompt-title">AI agent news digest</div>
+            <div class="prompt-desc">Chains web_search calls, ranks and filters by relevance</div>
+            <div class="prompt-chips"><span class="chip">web_search</span><span class="chip">chain</span><span class="chip">filter</span></div>
+          </div>
+          <div class="prompt-card" onclick="usePrompt('Design a production RAG pipeline architecture that handles 1 million daily queries. Include rough cost estimates.')">
+            <div class="prompt-tag">agentic</div>
+            <div class="prompt-title">RAG architecture design</div>
+            <div class="prompt-desc">Complex multi-node reasoning with calculator for cost estimation</div>
+            <div class="prompt-chips"><span class="chip">rag_retriever</span><span class="chip">calculator</span><span class="chip">web_search</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// CONFIGURATION — replace with your API key
+// Get one free at: https://console.anthropic.com
+// ─────────────────────────────────────────────
+const ANTHROPIC_API_KEY = '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';
+
+const SYSTEM_PROMPT = `You are an AI agent embedded in "AgentGraph" — a portfolio project by a software engineer targeting AI engineering roles. The app demonstrates LangGraph-style multi-tool agent architecture.
+
+You MUST respond using this exact format every single time:
+
+**[PLANNER]** State your plan in 1-2 sentences: what tools you will use and why.
+
+**[TOOL: tool_name]** Describe what you called and what you found. Valid tool names: web_search, calculator, rag_retriever. Use whichever ones genuinely fit the question. You may have multiple TOOL sections.
+
+**[SYNTHESIS]** Your full, detailed answer. Be technically precise and genuinely helpful. Use markdown-style formatting with **bold** for emphasis and backticks for code.
+
+**[GRAPH STATE]** {"nodes_visited": ["planner","router","web_search","aggregator","synthesizer"], "iterations": 2, "tokens": 480}
+
+Rules: always use at least one TOOL section. Be specific and technical. The tokens value should be a realistic number between 250-900.`;
+
+let sessionRuns = 0, sessionTools = 0, sessionTokens = 0;
+const history = [];
+
+function switchTab(tab, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('visible'));
+  el.classList.add('active');
+  document.getElementById('view-' + tab).classList.add('visible');
+}
+
+function addTrace(type, text) {
+  const log = document.getElementById('trace-log');
+  const empty = log.querySelector('.trace-empty');
+  if (empty) empty.remove();
+  const d = document.createElement('div');
+  d.className = 'trace-entry t-' + type;
+  const ts = new Date().toTimeString().slice(0, 8);
+  d.innerHTML = `<span class="trace-time">${ts}</span>  ${text}`;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+
+function processTrace(content, elapsed) {
+  const planMatch = content.match(/\*\*\[PLANNER\]\*\*([\s\S]*?)(?=\*\*\[|$)/);
+  const toolMatches = [...content.matchAll(/\*\*\[TOOL: ([^\]]+)\]\*\*([\s\S]*?)(?=\*\*\[|$)/g)];
+  const stateMatch = content.match(/\{[^}]*"nodes_visited"[^}]*\}/);
+
+  addTrace('node', '→ START node entered');
+  if (planMatch) {
+    const p = planMatch[1].trim();
+    addTrace('llm', '→ planner: ' + p.slice(0, 90) + (p.length > 90 ? '…' : ''));
+  }
+  addTrace('router', '→ router: evaluating conditional edges');
+
+  let tc = 0;
+  for (const m of toolMatches) {
+    const name = m[1].trim(), preview = m[2].trim().slice(0, 75);
+    addTrace('tool', `→ ${name}: ${preview}${m[2].trim().length > 75 ? '…' : ''}`);
+    flashTool(name);
+    tc++;
+  }
+
+  addTrace('node', '→ aggregator: merging tool results');
+  addTrace('llm', '→ synthesizer: generating final response');
+  addTrace('done', `✓ done in ${elapsed}ms · ${tc} tool call${tc !== 1 ? 's' : ''}`);
+
+  if (stateMatch) {
+    try {
+      const s = JSON.parse(stateMatch[0]);
+      sessionTokens += s.tokens || 0;
+      document.getElementById('stat-tokens').textContent = sessionTokens.toLocaleString();
+    } catch(e) {}
+  }
+  sessionTools += tc;
+  document.getElementById('stat-tools').textContent = sessionTools;
+  document.getElementById('graph-run-status').textContent = 'completed';
+}
+
+function flashTool(name) {
+  const map = { web_search:'tool-search', calculator:'tool-calc', rag_retriever:'tool-rag', code_executor:'tool-code', memory_store:'tool-memory' };
+  const el = document.getElementById(map[name]);
+  if (!el) return;
+  el.classList.add('active');
+  if (!['web_search','calculator','rag_retriever'].includes(name)) setTimeout(() => el.classList.remove('active'), 3000);
+}
+
+function formatMsg(content) {
+  let out = content;
+  out = out.replace(/\*\*\[PLANNER\]\*\*/g, '<div class="node-label planner">PLANNER</div>');
+  out = out.replace(/\*\*\[TOOL: ([^\]]+)\]\*\*/g, '<div class="node-label tool">TOOL · $1</div>');
+  out = out.replace(/\*\*\[SYNTHESIS\]\*\*/g, '<div class="node-label synth">SYNTHESIS</div>');
+  out = out.replace(/\*\*\[GRAPH STATE\]\*\*[\s\S]*/, '');
+  out = out.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  out = out.replace(/`([^`]+)`/g, '<code>$1</code>');
+  out = out.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+  return out;
+}
+
+function appendMsg(role, html) {
+  const msgs = document.getElementById('messages');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + role;
+  const lbl = document.createElement('div');
+  lbl.className = 'msg-label';
+  lbl.textContent = role === 'user' ? 'you' : 'agent';
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.innerHTML = html;
+  wrap.appendChild(lbl);
+  wrap.appendChild(bubble);
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function sendMsg() {
+  const input = document.getElementById('user-input');
+  const btn = document.getElementById('send-btn');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  btn.disabled = true;
+
+  appendMsg('user', text);
+  history.push({ role: 'user', content: text });
+
+  const msgs = document.getElementById('messages');
+  const typing = document.createElement('div');
+  typing.id = 'typing';
+  typing.className = 'typing';
+  typing.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+  msgs.appendChild(typing);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  document.getElementById('trace-log').innerHTML = '';
+  addTrace('node', '→ graph initialized');
+  addTrace('llm', '→ planner: parsing query…');
+  document.getElementById('graph-run-status').textContent = 'running';
+
+  const start = Date.now();
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: SYSTEM_PROMPT,
+        messages: history
+      })
+    });
+
+    const data = await res.json();
+    const elapsed = Date.now() - start;
+    const content = data.content?.map(b => b.text || '').join('') || 'No response received.';
+
+    history.push({ role: 'assistant', content });
+    document.getElementById('typing')?.remove();
+
+    sessionRuns++;
+    document.getElementById('stat-runs').textContent = sessionRuns;
+    processTrace(content, elapsed);
+    appendMsg('assistant', formatMsg(content));
+
+  } catch (err) {
+    document.getElementById('typing')?.remove();
+    addTrace('done', '✗ error: ' + err.message);
+    appendMsg('assistant', 'Connection error. Check your API key in <code>index.html</code>.');
+  }
+
+  btn.disabled = false;
+  input.focus();
+}
+
+function usePrompt(p) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('visible'));
+  document.querySelectorAll('.tab')[0].classList.add('active');
+  document.getElementById('view-agent').classList.add('visible');
+  document.getElementById('user-input').value = p;
+  document.getElementById('user-input').focus();
+}
+</script>
+</body>
+</html>
